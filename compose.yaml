@@ -5,18 +5,12 @@ services:
     #build:
     #  context: ./watcher
     #  dockerfile: Dockerfile
-
     restart: unless-stopped
-
     network_mode: host
-
     env_file:
       - .env
-
     environment:
       TZ: America/New_York
-
     volumes:
-      - /home/steve/.android/adbkey:/home/watcher/.android/adbkey:ro
-      - /home/steve/.android/adbkey.pub:/home/watcher/.android/adbkey.pub:ro
-
+      - ~/.android/adbkey:/home/watcher/.android/adbkey:ro
+      - ~/.android/adbkey.pub:/home/watcher/.android/adbkey.pub:ro
