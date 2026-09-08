@@ -1,7 +1,7 @@
 name: blink
 services:
   main:
-    image: dundiditnow/watcher:0.0.2
+    image: froststevefrost/watcher:0.0.2
     #build:
     #  context: ./watcher
     #  dockerfile: Dockerfile
