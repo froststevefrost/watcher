@@ -1,16 +1,11 @@
 name: blink
 services:
   main:
-    image: froststevefrost/watcher:0.0.3
-    #build:
-    #  context: ./watcher
-    #  dockerfile: Dockerfile
+    image: ghcr.io/froststevefrost/watcher:0.0.4
     restart: unless-stopped
     network_mode: host
     env_file:
       - .env
-    environment:
-      TZ: America/New_York
     volumes:
       - ~/.android/adbkey:/home/watcher/.android/adbkey:ro
       - ~/.android/adbkey.pub:/home/watcher/.android/adbkey.pub:ro

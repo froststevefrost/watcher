@@ -1,7 +1,11 @@
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1
-ENV TZ=America/New_York
+# Neutral default only — the real value should be set via TZ in .env /
+# compose.yaml so the 07:00-16:00 polling window matches each deployment's
+# local time. Leaving this hardcoded to one timezone would silently give
+# wrong polling hours to anyone who forgets to set TZ.
+ENV TZ=UTC
 
 RUN useradd -u 1000 -m watcher
 WORKDIR /app
