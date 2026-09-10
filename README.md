@@ -12,6 +12,7 @@ Standard install on the host that will run the container.
 ### 2. An Apprise-compatible notification target
 Any URL Apprise supports (ntfy, Discord, Pushover, a homelab Apprise API
 endpoint, etc). You'll need the full notify URL. (ex: https://alerts.example.com/notify/apprise)
+A webhook URL will work as well.
 
 ### 3. A dedicated Android phone running the Blink Charging app
 - Log into the Blink app and favorite/pin the charger screen you want to
