@@ -104,7 +104,7 @@ def within_polling_hours():
     if now.weekday() >= 5:
         return False
 
-    return 4 <= now.hour < 16
+    return 7 <= now.hour < 16
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +185,62 @@ def parse_regions(raw):
 REGIONS = parse_regions(
     env("CROP_REGIONS", required=True)
 )
+
+
+# ---------------------------------------------------------------------------
+# Force-refresh before sampling
+# ---------------------------------------------------------------------------
+
+def parse_taps(raw):
+    """
+    Parse:
+
+        x1,y1;x2,y2
+
+    into:
+
+        [(x1, y1), (x2, y2)]
+    """
+
+    taps = []
+
+    for part in raw.split(";"):
+        part = part.strip()
+
+        if not part:
+            continue
+
+        x, y = (int(v.strip()) for v in part.split(","))
+        taps.append((x, y))
+
+    return taps
+
+
+# Replays the manual "tap My Location, tap Parking Garage" sequence —
+# the app doesn't auto-refresh port status on its own, so without this
+# the watcher just re-confirms stale data every cycle. Defaults below
+# are calibrated for the One Loudoun Parking Garage screen; recalibrate
+# via CROP_REGIONS-style coordinate-finding if pointed elsewhere.
+REFRESH_TAPS = parse_taps(
+    env("REFRESH_TAPS", "535,3028;400,550")
+)
+
+REFRESH_TAP_DELAY = float(env("REFRESH_TAP_DELAY", "1"))
+REFRESH_SETTLE_DELAY = float(env("REFRESH_SETTLE_DELAY", "2"))
+
+
+def refresh_screen(device):
+    """
+    Force the app to re-fetch port status by replaying the same
+    navigation a manual refresh uses (tap the "My Location" tab,
+    then tap back into the favorited charger).
+    """
+
+    for x, y in REFRESH_TAPS:
+        device.shell(f"input tap {x} {y}")
+        time.sleep(REFRESH_TAP_DELAY)
+
+    time.sleep(REFRESH_SETTLE_DELAY)
 
 
 # ---------------------------------------------------------------------------
@@ -352,8 +408,11 @@ def sample_color(image, box):
 
 def sample_regions(device):
     """
-    Take one screenshot and sample all configured regions.
+    Force a refresh, then take one screenshot and sample all
+    configured regions.
     """
+
+    refresh_screen(device)
 
     image = get_screenshot(device)
 
@@ -591,4 +650,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
