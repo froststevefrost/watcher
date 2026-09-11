@@ -81,7 +81,7 @@ below.
 
 ```bash
 git clone <repo-url>
-cd blink
+cd watcher
 cp .env.example .env
 ```
 
