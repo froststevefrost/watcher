@@ -10,9 +10,8 @@ when it transitions to available.
 Standard install on the host that will run the container.
 
 ### 2. An Apprise-compatible notification target
-- Any URL Apprise supports (ntfy, Discord, Pushover, a homelab Apprise API
+Any URL Apprise supports (ntfy, Discord, Pushover, a homelab Apprise API
 endpoint, etc). You'll need the full notify URL.
-- Any webhook URL will work as well.
 
 ### 3. A dedicated Android phone running the Blink Charging app
 - Log into the Blink app and favorite/pin the charger screen you want to
@@ -92,7 +91,9 @@ Edit `.env`:
 |---|---|
 | `ADB_HOST` | Static IP of the phone |
 | `ADB_PORT` | Network ADB port (`5555` for `adb tcpip`, or the wireless-debugging debug port) |
-| `TZ` | Timezone for this deployment (e.g. `America/New_York`). Drives the Mon–Fri 07:00–16:00 polling window — set this to *your* local timezone |
+| `TZ` | Timezone for this deployment (e.g. `America/New_York`). Days/hours below are interpreted in this timezone |
+| `WATCH_START_TIME` | Start of the polling window, 24-hour `HH:MM`, inclusive. Days watched are always Mon–Fri |
+| `WATCH_END_TIME` | End of the polling window, 24-hour `HH:MM`, exclusive |
 | `POLL_INTERVAL` | Seconds between polls |
 | `APPRISE_URL` | Your Apprise notify URL |
 | `CROP_REGIONS` | See calibration below |

@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from datetime import time as dtime
 
 import apprise
 from adb_shell.adb_device import AdbDeviceTcp
@@ -132,20 +133,134 @@ def screen_appears_off(colors):
 # Polling schedule
 # ---------------------------------------------------------------------------
 
+def parse_time_of_day(raw, name):
+    """
+    Parse an HH:MM (24-hour) string into a datetime.time.
+    """
+
+    parts = raw.split(":")
+
+    if len(parts) != 2:
+        log.error(
+            "Bad %s value: %r (expected HH:MM)",
+            name,
+            raw,
+        )
+        sys.exit(1)
+
+    try:
+        hour, minute = (int(p) for p in parts)
+    except ValueError:
+        log.error(
+            "Bad %s value: %r (expected HH:MM)",
+            name,
+            raw,
+        )
+        sys.exit(1)
+
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        log.error(
+            "Bad %s value: %r (hour/minute out of range)",
+            name,
+            raw,
+        )
+        sys.exit(1)
+
+    return dtime(hour=hour, minute=minute)
+
+
+WEEKDAY_NAMES = {
+    "mon": 0,
+    "tue": 1,
+    "wed": 2,
+    "thu": 3,
+    "fri": 4,
+    "sat": 5,
+    "sun": 6,
+}
+
+WEEKDAY_DISPLAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def parse_watch_days(raw, name):
+    """
+    Parse a comma-separated list of Mon/Tue/Wed/Thu/Fri/Sat/Sun
+    (case-insensitive) into a set of Python weekday ints
+    (Monday=0 ... Sunday=6).
+    """
+
+    days = set()
+
+    for part in raw.split(","):
+        part = part.strip().lower()
+
+        if not part:
+            continue
+
+        if part not in WEEKDAY_NAMES:
+            log.error(
+                "Bad %s value: %r (expected comma-separated "
+                "Mon,Tue,Wed,Thu,Fri,Sat,Sun)",
+                name,
+                part,
+            )
+            sys.exit(1)
+
+        days.add(WEEKDAY_NAMES[part])
+
+    if not days:
+        log.error(
+            "%s parsed to zero days",
+            name,
+        )
+        sys.exit(1)
+
+    return days
+
+
+WATCH_DAYS = parse_watch_days(
+    env("WATCH_DAYS", "Mon,Tue,Wed,Thu,Fri"),
+    "WATCH_DAYS",
+)
+
+WATCH_START_TIME = parse_time_of_day(
+    env("WATCH_START_TIME", "07:00"),
+    "WATCH_START_TIME",
+)
+
+WATCH_END_TIME = parse_time_of_day(
+    env("WATCH_END_TIME", "16:00"),
+    "WATCH_END_TIME",
+)
+
+if WATCH_START_TIME >= WATCH_END_TIME:
+    log.error(
+        "WATCH_START_TIME (%s) must be earlier than "
+        "WATCH_END_TIME (%s); overnight windows aren't "
+        "supported",
+        WATCH_START_TIME.strftime("%H:%M"),
+        WATCH_END_TIME.strftime("%H:%M"),
+    )
+    sys.exit(1)
+
+
 def within_polling_hours():
     """
-    Poll Monday-Friday from 07:00 through 15:59.
+    Poll on the configured WATCH_DAYS, between WATCH_START_TIME
+    (inclusive) and WATCH_END_TIME (exclusive).
 
-    Uses the local timezone of the machine running this script.
+    Uses the local timezone of the machine running this script (set
+    via TZ).
     """
 
     now = datetime.now()
 
-    # Monday = 0 ... Sunday = 6
-    if now.weekday() >= 5:
+    if now.weekday() not in WATCH_DAYS:
         return False
 
-    return 7 <= now.hour < 16
+    current_time = now.time()
+
+    return WATCH_START_TIME <= current_time < WATCH_END_TIME
 
 
 # ---------------------------------------------------------------------------
@@ -523,8 +638,15 @@ def main():
         "Poll interval: %s seconds",
         POLL_INTERVAL,
     )
+    watched_days = ",".join(
+        WEEKDAY_DISPLAY[d] for d in sorted(WATCH_DAYS)
+    )
+
     log.info(
-        "Polling schedule: Monday-Friday, 07:00-16:00",
+        "Polling schedule: %s, %s-%s",
+        watched_days,
+        WATCH_START_TIME.strftime("%H:%M"),
+        WATCH_END_TIME.strftime("%H:%M"),
     )
     log.info(
         "Available color: %s +/- %.1f",
