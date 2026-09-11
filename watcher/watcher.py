@@ -576,7 +576,7 @@ def sample_color(image, box):
     # Reduce the crop before calculating the average.
     crop = crop.resize((10, 10))
 
-    pixels = list(crop.getdata())
+    pixels = list(crop.get_flattened_data())
 
     count = len(pixels)
 
