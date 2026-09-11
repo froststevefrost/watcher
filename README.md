@@ -149,7 +149,7 @@ walking away from it.
 
 ## ADB security and authentication
 
-### Watcher connects to the Android device using ADB's RSA authentication. The container is given the same ADB private/public key pair used by the host's normal ADB client, and uses that key to authenticate to the device.
+Watcher connects to the Android device using ADB's RSA authentication. The container is given the same ADB private/public key pair used by the host's normal ADB client, and uses that key to authenticate to the device.
 
 The ADB private key is sensitive. Anyone who obtains an authorized ADB private key may be able to authenticate to devices that trust that key. For this reason:
  - Never expose the Android device's ADB port (5555 by default) directly to the Internet.
@@ -158,4 +158,4 @@ The ADB private key is sensitive. Anyone who obtains an authorized ADB private k
  - Be aware that the Watcher container has read access to the ADB private key. Although the container runs as a non-root user with additional Docker security restrictions, a compromise of the container could expose that key.
  - Consider using a dedicated Android/ADB identity for Watcher rather than sharing an ADB key with other systems when practical.
 
-### Watcher does not save screenshots to disk. Screenshots are captured over ADB and processed in memory solely to determine the configured screen colors. The screenshot data is not sent through Apprise.
+Watcher does not save screenshots to disk. Screenshots are captured over ADB and processed in memory solely to determine the configured screen colors. The screenshot data is not sent through Apprise.
