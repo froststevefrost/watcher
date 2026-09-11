@@ -1,22 +1,21 @@
-FROM python:3.13-slim
+FROM python:3.13-alpine
 
 ENV PYTHONUNBUFFERED=1
-# Neutral default only — the real value should be set via TZ in .env /
-# compose.yaml so the 07:00-16:00 polling window matches each deployment's
-# local time. Leaving this hardcoded to one timezone would silently give
-# wrong polling hours to anyone who forgets to set TZ.
+# Neutral default only — real value comes from TZ in .env / env_file.
 ENV TZ=UTC
 
-RUN useradd -u 1000 -m watcher
+# Pull whatever security patches exist for the base image's own packages
+# (musl, busybox, openssl) at build time, not just at image-publish time.
+RUN apk update && apk upgrade --no-cache \
+    && apk add --no-cache tzdata ca-certificates
+
+RUN adduser -D -u 1000 watcher
 WORKDIR /app
 
 COPY --chown=watcher:watcher requirements.txt .
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends tzdata \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip uninstall -y pip setuptools wheel
 
 COPY --chown=watcher:watcher watcher.py .
 

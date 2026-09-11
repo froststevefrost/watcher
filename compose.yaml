@@ -9,3 +9,20 @@ services:
     volumes:
       - ~/.android/adbkey:/home/watcher/.android/adbkey:ro
       - ~/.android/adbkey.pub:/home/watcher/.android/adbkey.pub:ro
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=128m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tty: false
+    stdin_open: false
+    pids_limit: 512
+    mem_limit: 256m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
