@@ -88,6 +88,47 @@ def is_available(color):
 
 
 # ---------------------------------------------------------------------------
+# Screen-off/locked detection
+# ---------------------------------------------------------------------------
+
+# A locked or sleeping screen samples as pure black at any coordinate,
+# including the same CROP_REGIONS boxes used for availability checks.
+SCREEN_OFF_COLOR = (0, 0, 0)
+SCREEN_OFF_TOLERANCE = int(env("SCREEN_OFF_TOLERANCE", "15"))
+
+# Separate, longer-lived cooldown from DEBOUNCE_SECONDS since a locked
+# screen tends to stay locked for a while — no need to re-notify every
+# poll cycle.
+SCREEN_OFF_DEBOUNCE_SECONDS = int(
+    env("SCREEN_OFF_DEBOUNCE_SECONDS", "300")
+)
+
+
+def is_black(color):
+    """
+    Return True if a sampled color is close enough to pure black.
+    """
+
+    distance = color_distance(
+        color,
+        SCREEN_OFF_COLOR,
+    )
+
+    return distance <= SCREEN_OFF_TOLERANCE
+
+
+def screen_appears_off(colors):
+    """
+    Return True if every sampled region reads as black. A single dark
+    region could just be a charger's real status color, but all
+    configured regions reading black at once means the screen itself
+    is locked or asleep, not that every port happens to be that color.
+    """
+
+    return all(is_black(color) for color in colors.values())
+
+
+# ---------------------------------------------------------------------------
 # Polling schedule
 # ---------------------------------------------------------------------------
 
@@ -280,6 +321,30 @@ def notify(region_name):
         )
 
 
+def notify_screen_off():
+    """
+    Send the screen-locked/asleep notification.
+    """
+
+    body = (
+        "📱 The phone's screen appears locked or asleep — "
+        "availability monitoring is paused until it wakes up."
+    )
+
+    log.warning(
+        "Sending screen-off notification",
+    )
+
+    ok = apobj.notify(
+        body=body,
+    )
+
+    if not ok:
+        log.error(
+            "Apprise notification failed for screen-off alert",
+        )
+
+
 # ---------------------------------------------------------------------------
 # ADB connection
 # ---------------------------------------------------------------------------
@@ -441,6 +506,10 @@ def main():
         for name in REGIONS
     }
 
+    # Last time a screen-off notification was sent (shared across
+    # regions, since it describes the phone as a whole).
+    last_screen_off_notified_at = 0.0
+
     # Track whether we are currently inside polling hours.
     was_polling = False
 
@@ -461,6 +530,13 @@ def main():
         "Available color: %s +/- %.1f",
         AVAILABLE_COLOR,
         AVAILABLE_TOLERANCE,
+    )
+    log.info(
+        "Screen-off detection: color=%s +/- %s, "
+        "notify cooldown=%ss",
+        SCREEN_OFF_COLOR,
+        SCREEN_OFF_TOLERANCE,
+        SCREEN_OFF_DEBOUNCE_SECONDS,
     )
 
     log.info("Regions:")
@@ -525,12 +601,37 @@ def main():
 
             colors = sample_regions(device)
 
+            now = time.monotonic()
+
             log.debug(
                 "Sampled colors: %s",
                 colors,
             )
 
-            now = time.monotonic()
+            # ---------------------------------------------------------------
+            # Screen locked/asleep — every region reads black at once.
+            # Skip availability comparison this cycle so a blank screen
+            # doesn't get recorded as a real "went unavailable" change.
+            # ---------------------------------------------------------------
+
+            if screen_appears_off(colors):
+                log.warning(
+                    "All regions read black; phone screen appears "
+                    "locked or asleep. Skipping this cycle.",
+                )
+
+                elapsed = now - last_screen_off_notified_at
+
+                if elapsed >= SCREEN_OFF_DEBOUNCE_SECONDS:
+                    notify_screen_off()
+                    last_screen_off_notified_at = now
+                else:
+                    log.info(
+                        "Screen-off notification debounced",
+                    )
+
+                time.sleep(POLL_INTERVAL)
+                continue
 
             # ---------------------------------------------------------------
             # Check each region

@@ -9,10 +9,10 @@ when it transitions to available.
 ### 1. Docker + Docker Compose
 Standard install on the host that will run the container.
 
-### 2. A webhook or an Apprise-compatible notification target
-Any URL Apprise supports (ntfy, Discord, Pushover, a homelab Apprise API
-endpoint, etc). You'll need the full notify URL (ex: https://alerts.example.com/notify/apprise).
-A webhook URL will work as well.
+### 2. An Apprise-compatible notification target
+- Any URL Apprise supports (ntfy, Discord, Pushover, a homelab Apprise API
+endpoint, etc). You'll need the full notify URL.
+- Any webhook URL will work as well.
 
 ### 3. A dedicated Android phone running the Blink Charging app
 - Log into the Blink app and favorite/pin the charger screen you want to
@@ -98,6 +98,8 @@ Edit `.env`:
 | `CROP_REGIONS` | See calibration below |
 | `REFRESH_TAPS` | See calibration below |
 | `DEBOUNCE_SECONDS` | Minimum seconds between repeat notifications for the same region |
+| `SCREEN_OFF_TOLERANCE` | How close a region's color has to be to pure black to count as "screen locked/asleep" |
+| `SCREEN_OFF_DEBOUNCE_SECONDS` | Minimum seconds between repeat "screen is locked/asleep" notifications |
 
 ### Calibrating `CROP_REGIONS` and `REFRESH_TAPS`
 
@@ -123,6 +125,14 @@ from someone else's setup.
    ```
    x1,y1;x2,y2
    ```
+
+### Screen-off / locked detection
+
+The watcher reuses the same `CROP_REGIONS` coordinates to detect when the
+phone's screen is locked or asleep: if *every* configured region samples
+as black on the same cycle, it sends a (debounced) notification and skips
+availability comparison for that cycle, rather than a blank screen
+being mistaken for a real port-status change.
 
 ### Run it
 

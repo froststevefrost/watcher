@@ -1,7 +1,7 @@
-name: blink
+name: watcher
 services:
   main:
-    image: ghcr.io/froststevefrost/watcher:0.0.4
+    image: ghcr.io/froststevefrost/watcher:0.0.5
     restart: unless-stopped
     network_mode: host
     env_file:
