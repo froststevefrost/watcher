@@ -159,3 +159,17 @@ The ADB private key is sensitive. Anyone who obtains an authorized ADB private k
  - Consider using a dedicated Android/ADB identity for Watcher rather than sharing an ADB key with other systems when practical.
 
 Watcher does not save screenshots to disk. Screenshots are captured over ADB and processed in memory solely to determine the configured screen colors. The screenshot data is not sent through Apprise.
+
+
+
+  
+
+## License
+
+Watcher is free and open-source software licensed under the GNU General Public License v3.0 (GPLv3).
+
+You are free to use, modify, and redistribute this software under the terms of the GPLv3. If you distribute modified versions, you must make the corresponding source code available under the same license.
+
+See the LICENSE file for the full license text.
+
+Copyright © 2026 froststevefrost.
