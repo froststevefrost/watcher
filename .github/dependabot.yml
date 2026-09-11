@@ -1,0 +1,12 @@
+version: 2
+
+updates:
+  - package-ecosystem: "pip"
+    directory: "/watcher"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/watcher"
+    schedule:
+      interval: "weekly"
