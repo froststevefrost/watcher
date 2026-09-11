@@ -43,14 +43,102 @@ def env(name, default=None, required=False):
     return value
 
 
-ADB_HOST = env("ADB_HOST", required=True)
-ADB_PORT = int(env("ADB_PORT", "5555"))
+def positive_int_env(name, default):
+    """
+    Read an environment variable as an integer that must be > 0.
+    """
+    raw = env(name, str(default))
 
-POLL_INTERVAL = int(env("POLL_INTERVAL", "30"))
+    try:
+        value = int(raw)
+    except ValueError:
+        log.error(
+            "Bad %s value: %r (expected integer)",
+            name,
+            raw,
+        )
+        sys.exit(1)
+
+    if value <= 0:
+        log.error(
+            "%s must be greater than zero",
+            name,
+        )
+        sys.exit(1)
+
+    return value
+
+
+def nonnegative_int_env(name, default):
+    """
+    Read an environment variable as an integer that must be >= 0.
+    """
+    raw = env(name, str(default))
+
+    try:
+        value = int(raw)
+    except ValueError:
+        log.error(
+            "Bad %s value: %r (expected integer)",
+            name,
+            raw,
+        )
+        sys.exit(1)
+
+    if value < 0:
+        log.error(
+            "%s must be zero or greater",
+            name,
+        )
+        sys.exit(1)
+
+    return value
+
+
+def nonnegative_float_env(name, default):
+    """
+    Read an environment variable as a float that must be >= 0.
+    """
+    raw = env(name, str(default))
+
+    try:
+        value = float(raw)
+    except ValueError:
+        log.error(
+            "Bad %s value: %r (expected number)",
+            name,
+            raw,
+        )
+        sys.exit(1)
+
+    if value < 0:
+        log.error(
+            "%s must be zero or greater",
+            name,
+        )
+        sys.exit(1)
+
+    return value
+
+
+ADB_HOST = env("ADB_HOST", required=True)
+
+ADB_PORT = positive_int_env("ADB_PORT", 5555)
+
+if ADB_PORT > 65535:
+    log.error(
+        "ADB_PORT must be between 1 and 65535"
+    )
+    sys.exit(1)
+
+POLL_INTERVAL = positive_int_env("POLL_INTERVAL", 30)
 
 APPRISE_URL = env("APPRISE_URL", required=True)
 
-DEBOUNCE_SECONDS = int(env("DEBOUNCE_SECONDS", "5"))
+DEBOUNCE_SECONDS = nonnegative_int_env(
+    "DEBOUNCE_SECONDS",
+    5,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +154,6 @@ AVAILABLE_TOLERANCE = 20
 
 def color_distance(a, b):
     """Return Euclidean distance between two RGB colors."""
-
     return (
         (a[0] - b[0]) ** 2
         + (a[1] - b[1]) ** 2
@@ -95,13 +182,18 @@ def is_available(color):
 # A locked or sleeping screen samples as pure black at any coordinate,
 # including the same CROP_REGIONS boxes used for availability checks.
 SCREEN_OFF_COLOR = (0, 0, 0)
-SCREEN_OFF_TOLERANCE = int(env("SCREEN_OFF_TOLERANCE", "15"))
+
+SCREEN_OFF_TOLERANCE = nonnegative_int_env(
+    "SCREEN_OFF_TOLERANCE",
+    15,
+)
 
 # Separate, longer-lived cooldown from DEBOUNCE_SECONDS since a locked
 # screen tends to stay locked for a while — no need to re-notify every
 # poll cycle.
-SCREEN_OFF_DEBOUNCE_SECONDS = int(
-    env("SCREEN_OFF_DEBOUNCE_SECONDS", "300")
+SCREEN_OFF_DEBOUNCE_SECONDS = positive_int_env(
+    "SCREEN_OFF_DEBOUNCE_SECONDS",
+    300,
 )
 
 
@@ -126,7 +218,10 @@ def screen_appears_off(colors):
     is locked or asleep, not that every port happens to be that color.
     """
 
-    return all(is_black(color) for color in colors.values())
+    return all(
+        is_black(color)
+        for color in colors.values()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +261,10 @@ def parse_time_of_day(raw, name):
         )
         sys.exit(1)
 
-    return dtime(hour=hour, minute=minute)
+    return dtime(
+        hour=hour,
+        minute=minute,
+    )
 
 
 WEEKDAY_NAMES = {
@@ -179,7 +277,15 @@ WEEKDAY_NAMES = {
     "sun": 6,
 }
 
-WEEKDAY_DISPLAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+WEEKDAY_DISPLAY = [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+    "Sun",
+]
 
 
 def parse_watch_days(raw, name):
@@ -219,7 +325,10 @@ def parse_watch_days(raw, name):
 
 
 WATCH_DAYS = parse_watch_days(
-    env("WATCH_DAYS", "Mon,Tue,Wed,Thu,Fri"),
+    env(
+        "WATCH_DAYS",
+        "Mon,Tue,Wed,Thu,Fri",
+    ),
     "WATCH_DAYS",
 )
 
@@ -249,8 +358,8 @@ def within_polling_hours():
     Poll on the configured WATCH_DAYS, between WATCH_START_TIME
     (inclusive) and WATCH_END_TIME (exclusive).
 
-    Uses the local timezone of the machine running this script (set
-    via TZ).
+    Uses the local timezone of the machine running this script
+    (set via TZ).
     """
 
     now = datetime.now()
@@ -260,7 +369,11 @@ def within_polling_hours():
 
     current_time = now.time()
 
-    return WATCH_START_TIME <= current_time < WATCH_END_TIME
+    return (
+        WATCH_START_TIME
+        <= current_time
+        < WATCH_END_TIME
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -297,6 +410,14 @@ def parse_regions(raw):
             sys.exit(1)
 
         name, coords = part.split(":", 1)
+        name = name.strip()
+
+        if not name:
+            log.error(
+                "Bad CROP_REGIONS entry (empty name): %r",
+                part,
+            )
+            sys.exit(1)
 
         try:
             box = tuple(
@@ -321,6 +442,15 @@ def parse_regions(raw):
 
         x1, y1, x2, y2 = box
 
+        if x1 < 0 or y1 < 0:
+            log.error(
+                "Invalid region %s: coordinates must be "
+                "non-negative: %s",
+                name,
+                box,
+            )
+            sys.exit(1)
+
         if x2 <= x1 or y2 <= y1:
             log.error(
                 "Invalid region %s: %s",
@@ -329,10 +459,19 @@ def parse_regions(raw):
             )
             sys.exit(1)
 
-        regions[name.strip()] = box
+        if name in regions:
+            log.error(
+                "Duplicate CROP_REGIONS name: %s",
+                name,
+            )
+            sys.exit(1)
+
+        regions[name] = box
 
     if not regions:
-        log.error("CROP_REGIONS parsed to zero regions")
+        log.error(
+            "CROP_REGIONS parsed to zero regions"
+        )
         sys.exit(1)
 
     return regions
@@ -366,8 +505,44 @@ def parse_taps(raw):
         if not part:
             continue
 
-        x, y = (int(v.strip()) for v in part.split(","))
+        try:
+            values = [
+                int(v.strip())
+                for v in part.split(",")
+            ]
+        except ValueError:
+            log.error(
+                "Bad REFRESH_TAPS entry: %r "
+                "(expected x,y)",
+                part,
+            )
+            sys.exit(1)
+
+        if len(values) != 2:
+            log.error(
+                "Bad REFRESH_TAPS entry: %r "
+                "(expected x,y)",
+                part,
+            )
+            sys.exit(1)
+
+        x, y = values
+
+        if x < 0 or y < 0:
+            log.error(
+                "Bad REFRESH_TAPS entry: %r "
+                "(coordinates must be non-negative)",
+                part,
+            )
+            sys.exit(1)
+
         taps.append((x, y))
+
+    if not taps:
+        log.error(
+            "REFRESH_TAPS parsed to zero taps"
+        )
+        sys.exit(1)
 
     return taps
 
@@ -378,11 +553,21 @@ def parse_taps(raw):
 # are calibrated for the One Loudoun Parking Garage screen; recalibrate
 # via CROP_REGIONS-style coordinate-finding if pointed elsewhere.
 REFRESH_TAPS = parse_taps(
-    env("REFRESH_TAPS", "535,3028;400,550")
+    env(
+        "REFRESH_TAPS",
+        "535,3028;400,550",
+    )
 )
 
-REFRESH_TAP_DELAY = float(env("REFRESH_TAP_DELAY", "1"))
-REFRESH_SETTLE_DELAY = float(env("REFRESH_SETTLE_DELAY", "2"))
+REFRESH_TAP_DELAY = nonnegative_float_env(
+    "REFRESH_TAP_DELAY",
+    1,
+)
+
+REFRESH_SETTLE_DELAY = nonnegative_float_env(
+    "REFRESH_SETTLE_DELAY",
+    2,
+)
 
 
 def refresh_screen(device):
@@ -393,7 +578,9 @@ def refresh_screen(device):
     """
 
     for x, y in REFRESH_TAPS:
-        device.shell(f"input tap {x} {y}")
+        device.shell(
+            f"input tap {x} {y}"
+        )
         time.sleep(REFRESH_TAP_DELAY)
 
     time.sleep(REFRESH_SETTLE_DELAY)
@@ -404,6 +591,7 @@ def refresh_screen(device):
 # ---------------------------------------------------------------------------
 
 apobj = apprise.Apprise()
+
 apobj.add(APPRISE_URL)
 
 
@@ -411,8 +599,6 @@ def notify(region_name):
     """
     Send the availability notification.
     """
-
-    #title = f"🔌 {region_name} is open!"
 
     body = (
         f"🔌 {region_name} is open!\n\n"
@@ -425,7 +611,6 @@ def notify(region_name):
     )
 
     ok = apobj.notify(
-        #title=title,
         body=body,
     )
 
@@ -456,7 +641,8 @@ def notify_screen_off():
 
     if not ok:
         log.error(
-            "Apprise notification failed for screen-off alert",
+            "Apprise notification failed for "
+            "screen-off alert",
         )
 
 
@@ -576,12 +762,17 @@ def sample_color(image, box):
     # Reduce the crop before calculating the average.
     crop = crop.resize((10, 10))
 
-    pixels = list(crop.get_flattened_data())
+    pixels = list(
+        crop.get_flattened_data()
+    )
 
     count = len(pixels)
 
     return tuple(
-        sum(pixel[channel] for pixel in pixels) // count
+        sum(
+            pixel[channel]
+            for pixel in pixels
+        ) // count
         for channel in range(3)
     )
 
@@ -628,18 +819,24 @@ def main():
     # Track whether we are currently inside polling hours.
     was_polling = False
 
-    log.info("Starting blink watcher")
+    log.info(
+        "Starting blink watcher"
+    )
+
     log.info(
         "ADB target: %s:%s",
         ADB_HOST,
         ADB_PORT,
     )
+
     log.info(
         "Poll interval: %s seconds",
         POLL_INTERVAL,
     )
+
     watched_days = ",".join(
-        WEEKDAY_DISPLAY[d] for d in sorted(WATCH_DAYS)
+        WEEKDAY_DISPLAY[d]
+        for d in sorted(WATCH_DAYS)
     )
 
     log.info(
@@ -648,11 +845,13 @@ def main():
         WATCH_START_TIME.strftime("%H:%M"),
         WATCH_END_TIME.strftime("%H:%M"),
     )
+
     log.info(
         "Available color: %s +/- %.1f",
         AVAILABLE_COLOR,
         AVAILABLE_TOLERANCE,
     )
+
     log.info(
         "Screen-off detection: color=%s +/- %s, "
         "notify cooldown=%ss",
@@ -697,6 +896,7 @@ def main():
 
                 # Check once per minute while inactive.
                 time.sleep(60)
+
                 continue
 
             # ---------------------------------------------------------------
@@ -742,17 +942,25 @@ def main():
                     "locked or asleep. Skipping this cycle.",
                 )
 
-                elapsed = now - last_screen_off_notified_at
+                elapsed = (
+                    now
+                    - last_screen_off_notified_at
+                )
 
-                if elapsed >= SCREEN_OFF_DEBOUNCE_SECONDS:
+                if (
+                    elapsed
+                    >= SCREEN_OFF_DEBOUNCE_SECONDS
+                ):
                     notify_screen_off()
                     last_screen_off_notified_at = now
+
                 else:
                     log.info(
                         "Screen-off notification debounced",
                     )
 
                 time.sleep(POLL_INTERVAL)
+
                 continue
 
             # ---------------------------------------------------------------
@@ -788,16 +996,25 @@ def main():
                     color,
                 )
 
-                was_available = is_available(previous)
-                now_available = is_available(color)
+                was_available = is_available(
+                    previous
+                )
+
+                now_available = is_available(
+                    color
+                )
 
                 # -----------------------------------------------------------
                 # Only notify when transitioning INTO available.
                 # -----------------------------------------------------------
 
-                if not was_available and now_available:
+                if (
+                    not was_available
+                    and now_available
+                ):
                     elapsed = (
-                        now - last_notified_at[name]
+                        now
+                        - last_notified_at[name]
                     )
 
                     if elapsed >= DEBOUNCE_SECONDS:
@@ -817,7 +1034,10 @@ def main():
                             name,
                         )
 
-                elif was_available and not now_available:
+                elif (
+                    was_available
+                    and not now_available
+                ):
                     log.info(
                         "%s is no longer available; "
                         "no notification",
@@ -839,7 +1059,6 @@ def main():
             BrokenPipeError,
             OSError,
         ) as e:
-
             log.warning(
                 "ADB connection problem: %s; "
                 "will reconnect next cycle",

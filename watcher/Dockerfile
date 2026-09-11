@@ -1,4 +1,5 @@
-FROM python:3.13-alpine
+#FROM python:3.13-alpine
+FROM python:3.13.15-alpine3.24@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d
 
 ENV PYTHONUNBUFFERED=1
 # Neutral default only — real value comes from TZ in .env / env_file.
@@ -14,7 +15,7 @@ WORKDIR /app
 
 COPY --chown=watcher:watcher requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt \
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt \
     && pip uninstall -y pip setuptools wheel
 
 COPY --chown=watcher:watcher watcher.py .
