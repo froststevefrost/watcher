@@ -140,6 +140,14 @@ DEBOUNCE_SECONDS = nonnegative_int_env(
     5,
 )
 
+# How many consecutive failed connection attempts before alerting that
+# the phone is unreachable (e.g. it rebooted and lost adb tcpip mode,
+# or dropped off WiFi).
+CONNECTION_FAILURE_THRESHOLD = positive_int_env(
+    "CONNECTION_FAILURE_THRESHOLD",
+    3,
+)
+
 
 # ---------------------------------------------------------------------------
 # Availability detection
@@ -646,6 +654,60 @@ def notify_screen_off():
         )
 
 
+def notify_connection_down(failure_count):
+    """
+    Alert that the phone has been unreachable over adb for several
+    consecutive cycles.
+    """
+
+    body = (
+        f"⚠️ Can't reach the phone over adb "
+        f"({failure_count} consecutive attempts failed).\n\n"
+        "It may have rebooted and lost adb tcpip mode, or "
+        "dropped off WiFi."
+    )
+
+    log.warning(
+        "Sending connection-down alert",
+    )
+
+    ok = apobj.notify(
+        body=body,
+    )
+
+    if not ok:
+        log.error(
+            "Apprise notification failed for "
+            "connection-down alert",
+        )
+
+
+def notify_connection_recovered(failure_count):
+    """
+    Let us know the phone came back after we'd already alerted
+    that it was unreachable.
+    """
+
+    body = (
+        f"✅ Reconnected to the phone after "
+        f"{failure_count} failed attempts."
+    )
+
+    log.info(
+        "Sending connection-recovered notice",
+    )
+
+    ok = apobj.notify(
+        body=body,
+    )
+
+    if not ok:
+        log.error(
+            "Apprise notification failed for "
+            "connection-recovered notice",
+        )
+
+
 # ---------------------------------------------------------------------------
 # ADB connection
 # ---------------------------------------------------------------------------
@@ -819,6 +881,11 @@ def main():
     # Track whether we are currently inside polling hours.
     was_polling = False
 
+    # Consecutive failed connection attempts, and whether we've
+    # already alerted about the current outage.
+    consecutive_failures = 0
+    connection_alert_sent = False
+
     log.info(
         "Starting blink watcher"
     )
@@ -858,6 +925,12 @@ def main():
         SCREEN_OFF_COLOR,
         SCREEN_OFF_TOLERANCE,
         SCREEN_OFF_DEBOUNCE_SECONDS,
+    )
+
+    log.info(
+        "Connection-failure alert threshold: %s "
+        "consecutive attempts",
+        CONNECTION_FAILURE_THRESHOLD,
     )
 
     log.info("Regions:")
@@ -915,7 +988,17 @@ def main():
             # ---------------------------------------------------------------
 
             if device is None:
+                was_down = connection_alert_sent
+
                 device = connect()
+
+                if was_down:
+                    notify_connection_recovered(
+                        consecutive_failures
+                    )
+
+                consecutive_failures = 0
+                connection_alert_sent = False
 
             # ---------------------------------------------------------------
             # Capture screenshot and sample regions
@@ -1066,6 +1149,17 @@ def main():
             )
 
             device = None
+            consecutive_failures += 1
+
+            if (
+                consecutive_failures
+                >= CONNECTION_FAILURE_THRESHOLD
+                and not connection_alert_sent
+            ):
+                notify_connection_down(
+                    consecutive_failures
+                )
+                connection_alert_sent = True
 
         # -------------------------------------------------------------------
         # Bad screenshot
