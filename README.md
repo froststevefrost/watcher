@@ -7,13 +7,17 @@ when it transitions to available.
 ## Prerequisites
 
 ### 1. Docker + Docker Compose
+
 Standard install on the host that will run the container.
 
 ### 2. An Apprise-compatible notification target
+
 Any URL Apprise supports (ntfy, Discord, Pushover, a homelab Apprise API
-endpoint, etc). You'll need the full notify URL.
+endpoint, etc). You'll need the full notify URL. (ex: https://alerts.example.com/notify/apprise)
+A webhook URL will work as well.
 
 ### 3. A dedicated Android phone running the Blink Charging app
+
 - Log into the Blink app and favorite/pin the charger screen you want to
   monitor.
 - Give the phone a **static DHCP reservation by MAC address** on your
@@ -24,62 +28,84 @@ endpoint, etc). You'll need the full notify URL.
   a locked screen.
 
 ### 4. Enable ADB debugging on the phone
+
 1. Settings → About phone → tap **Build number** 7 times to unlock
    Developer options.
-2. Settings → System → Developer options:
-   - Turn on **USB debugging**.
-   - On Android 11+, also turn on **Wireless debugging**.
+2. Settings → System → Developer options → turn on **USB debugging**.
+
+Do not use **Wireless debugging** for this project — see the next section
+for why.
 
 ### 5. Enable network ADB and authorize your computer's key
+
 This is the step that generates the key files this project bind-mounts
 into the container (`~/.android/adbkey` and `~/.android/adbkey.pub`), so
 it has to happen on the Docker **host**, not inside the container.
 
 Install the ADB client on the host first if you don't have it:
-```bash
+
+```
 sudo apt install adb          # Debian/Ubuntu
 # or: sudo dnf install android-tools
 ```
 
-**Android 11+ (recommended — no USB cable needed):**
-1. On the phone: Developer options → Wireless debugging → **Pair device
-   with pairing code**. Note the IP:port and 6-digit code shown.
-2. On the host:
-   ```bash
-   adb pair <phone-ip>:<pairing-port>
-   # enter the 6-digit code when prompted
-   adb connect <phone-ip>:<debug-port>
-   ```
-3. The phone will show an **"Allow wireless debugging on this network?"**
-   prompt — tap **Allow**. This is what authorizes your host's key.
+**This project only works over legacy plaintext ADB (`adb tcpip`) — it
+cannot use Android's native "Wireless debugging" feature, on any Android
+version.** The watcher connects with the `adb-shell` Python library,
+which only implements the older plaintext ADB protocol. Wireless
+debugging (Settings → Developer options → Wireless debugging → pair with
+code) opens a TLS-encrypted connection instead (an `STLS` handshake) that
+this library does not support at all. If the phone is paired that way,
+every connection attempt fails with:
 
-**Older Android (USB required for the first pairing):**
+```
+adb_shell.exceptions.InvalidCommandError: Unknown command: ... 'STLS'
+```
+
+Use USB every time you need to (re-)establish network ADB — there's no
+wireless-only path that works here:
+
 1. Connect the phone to the host via USB cable.
 2. On the host:
-   ```bash
+
+   ```
    adb devices
    # accept the "Allow USB debugging?" prompt on the phone
    adb tcpip 5555
    ```
+
 3. Unplug the cable, then:
-   ```bash
+
+   ```
    adb connect <phone-ip>:5555
    ```
 
-**Either way**, once `adb connect` succeeds, confirm the key files exist:
-```bash
+Once `adb connect` succeeds, confirm the key files exist:
+
+```
 ls ~/.android/adbkey ~/.android/adbkey.pub
 ```
+
 These are the files `compose.yaml` mounts read-only into the container —
 if they're missing, the connect/authorize step above didn't complete.
 
+**Legacy `adb tcpip` mode does not survive a phone reboot.** If the phone
+restarts for any reason (OS update, dead battery, manual reboot), it
+drops back to USB-only debugging and network ADB has to be re-enabled
+with the steps above before the watcher can reconnect. Repeated
+"can't reach the phone" alerts (see `CONNECTION_FAILURE_THRESHOLD` below)
+are the usual sign this has happened — redo the USB steps, and make sure
+`ADB_PORT` in `.env` is still pointing at the port you used (`5555`
+above), not a stale one from a previous pairing.
+
 ### 6. Note the port coordinates you'll need for calibration
+
 Not required yet, just have a way to take a screenshot handy — covered
 below.
 
 ## Setup
 
-```bash
+```
 git clone <repo-url>
 cd watcher
 cp .env.example .env
@@ -88,19 +114,20 @@ cp .env.example .env
 Edit `.env`:
 
 | Variable | Description |
-|---|---|
+| --- | --- |
 | `ADB_HOST` | Static IP of the phone |
-| `ADB_PORT` | Network ADB port (`5555` for `adb tcpip`, or the wireless-debugging debug port) |
-| `TZ` | Timezone for this deployment (e.g. `America/New_York`). Days/hours below are interpreted in this timezone |
-| `WATCH_START_TIME` | Start of the polling window, 24-hour `HH:MM`, inclusive. Days watched are always Mon–Fri |
-| `WATCH_END_TIME` | End of the polling window, 24-hour `HH:MM`, exclusive |
+| `ADB_PORT` | Network ADB port from `adb tcpip <port>` (`5555` unless you chose differently) |
+| `TZ` | Timezone for this deployment (e.g. `America/New_York`). Drives `WATCH_START_TIME`/`WATCH_END_TIME` below — set this to *your* local timezone |
 | `POLL_INTERVAL` | Seconds between polls |
 | `APPRISE_URL` | Your Apprise notify URL |
 | `CROP_REGIONS` | See calibration below |
 | `REFRESH_TAPS` | See calibration below |
-| `DEBOUNCE_SECONDS` | Minimum seconds between repeat notifications for the same region |
-| `SCREEN_OFF_TOLERANCE` | How close a region's color has to be to pure black to count as "screen locked/asleep" |
-| `SCREEN_OFF_DEBOUNCE_SECONDS` | Minimum seconds between repeat "screen is locked/asleep" notifications |
+| `DEBOUNCE_SECONDS` | Minimum seconds between repeat notifications for the same region becoming available |
+| `WATCH_DAYS` | Comma-separated days to poll on (`Mon,Tue,Wed,Thu,Fri` by default) |
+| `WATCH_START_TIME` / `WATCH_END_TIME` | `HH:MM` (24-hour) polling window, start inclusive / end exclusive (default `07:00`–`16:00`) |
+| `SCREEN_OFF_TOLERANCE` | Color-distance tolerance for detecting a locked/asleep screen (default `15`) |
+| `SCREEN_OFF_DEBOUNCE_SECONDS` | Minimum seconds between repeat screen-off alerts (default `300`) |
+| `CONNECTION_FAILURE_THRESHOLD` | Consecutive failed ADB connection attempts before alerting that the phone is unreachable (default `3`) |
 
 ### Calibrating `CROP_REGIONS` and `REFRESH_TAPS`
 
@@ -110,34 +137,31 @@ from someone else's setup.
 
 1. Open the Blink app to the charger screen you want to watch, then grab
    a screenshot:
-   ```bash
+
+   ```
    adb shell screencap -p > screen.png
    adb pull screen.png   # if not already on the host
    ```
+
 2. Open `screen.png` and find the pixel box `(x1,y1,x2,y2)` around each
    port's status indicator/button. Set `CROP_REGIONS` as:
+
    ```
    NAME:x1,y1,x2,y2;NAME2:x1,y1,x2,y2
    ```
+
 3. `REFRESH_TAPS` replays the manual "tap away, tap back" gesture the app
    needs to re-fetch live status. Find two tap points (e.g. a bottom nav
    tab, then the favorited charger) the same way, using the screenshot's
    pixel coordinates:
+
    ```
    x1,y1;x2,y2
    ```
 
-### Screen-off / locked detection
-
-The watcher reuses the same `CROP_REGIONS` coordinates to detect when the
-phone's screen is locked or asleep: if *every* configured region samples
-as black on the same cycle, it sends a (debounced) notification and skips
-availability comparison for that cycle, rather than a blank screen
-being mistaken for a real port-status change.
-
 ### Run it
 
-```bash
+```
 docker compose up -d
 docker compose logs -f
 ```
@@ -146,30 +170,18 @@ On first run it'll log each region's initial sampled color — confirm
 those look sane (and log `AVAILABLE`/`NOT AVAILABLE` correctly) before
 walking away from it.
 
+## Troubleshooting
 
-## ADB security and authentication
+### `adb_shell.exceptions.InvalidCommandError: Unknown command ... 'STLS'`
 
-Watcher connects to the Android device using ADB's RSA authentication. The container is given the same ADB private/public key pair used by the host's normal ADB client, and uses that key to authenticate to the device.
+The phone is currently paired over Wireless debugging (TLS) instead of
+legacy `adb tcpip` — this project's ADB library can't speak that
+protocol at all. Redo the USB `adb tcpip` pairing in [Prerequisites §5](#5-enable-network-adb-and-authorize-your-computers-key),
+and double-check `ADB_PORT` in `.env` matches the port you used, not a
+leftover Wireless-debugging port.
 
-The ADB private key is sensitive. Anyone who obtains an authorized ADB private key may be able to authenticate to devices that trust that key. For this reason:
- - Never expose the Android device's ADB port (5555 by default) directly to the Internet.
- - Restrict access to the ADB port with your firewall/VLAN so that only the Watcher host can reach the device.
- - Treat ~/.android/adbkey as a credential and protect it accordingly.
- - Be aware that the Watcher container has read access to the ADB private key. Although the container runs as a non-root user with additional Docker security restrictions, a compromise of the container could expose that key.
- - Consider using a dedicated Android/ADB identity for Watcher rather than sharing an ADB key with other systems when practical.
+### Repeated "can't reach the phone" alerts
 
-Watcher does not save screenshots to disk. Screenshots are captured over ADB and processed in memory solely to determine the configured screen colors. The screenshot data is not sent through Apprise.
+Almost always means the phone rebooted and lost `adb tcpip` mode (it
+doesn't survive reboots). Same fix as above.
 
-
-
-  
-
-## License
-
-Watcher is free and open-source software licensed under the GNU General Public License v3.0 (GPLv3).
-
-You are free to use, modify, and redistribute this software under the terms of the GPLv3. If you distribute modified versions, you must make the corresponding source code available under the same license.
-
-See the LICENSE file for the full license text.
-
-Copyright © 2026 froststevefrost.
