@@ -1,6 +1,5 @@
-# ----------  Builder stage ----------
-FROM python:3.14.7-alpine3.24 AS builder
-ENV PYTHONUNBUFFERED=1 TZ=UTC
+#FROM python:3.13-alpine
+FROM python:3.14.7-alpine3.24@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc
 
 RUN apk add --no-cache \
      gcc musl-dev libffi-dev openssl-dev cargo \
