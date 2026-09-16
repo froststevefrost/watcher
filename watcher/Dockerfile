@@ -1,24 +1,40 @@
-#FROM python:3.13-alpine
-FROM python:3.14.7-alpine3.24@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc
+FROM python:3.14.7-alpine3.24 AS builder
 
-ENV PYTHONUNBUFFERED=1
-# Neutral default only — real value comes from TZ in .env / env_file.
-ENV TZ=UTC
+RUN apk add --no-cache \
+     gcc musl-dev libffi-dev openssl-dev cargo \
+     tzdata ca-certificates
 
-# Pull whatever security patches exist for the base image's own packages
-# (musl, busybox, openssl) at build time, not just at image-publish time.
-RUN apk update && apk upgrade --no-cache \
-    && apk add --no-cache tzdata ca-certificates
+WORKDIR /src
 
-RUN adduser -D -u 1000 watcher
+COPY requirements.txt .
+
+RUN pip wheel \
+    --no-cache-dir \
+    --wheel-dir=/wheels \
+    -r requirements.txt
+
+# ----------  Runtime stage ----------
+FROM python:3.14.7-alpine3.24
+ENV PYTHONUNBUFFERED=1 TZ=UTC
+
+RUN apk add --no-cache tzdata ca-certificates && \
+     adduser -D -u 1000 watcher
+
 WORKDIR /app
 
-COPY --chown=watcher:watcher requirements.txt .
+COPY --from=builder /wheels /wheels
+COPY --from=builder /src/requirements.txt .
 
-RUN pip install --no-cache-dir --require-hashes -r requirements.txt \
-    && pip uninstall -y pip setuptools wheel
+RUN pip install \
+    --no-cache-dir \
+    --no-index \
+    --no-deps \
+    /wheels/*.whl && \
+    pip uninstall -y pip setuptools wheel && \
+    rm -rf /wheels
 
 COPY --chown=watcher:watcher watcher.py .
 
 USER 1000:1000
+
 CMD ["python", "-u", "watcher.py"]
