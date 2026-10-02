@@ -569,12 +569,12 @@ REFRESH_TAPS = parse_taps(
 
 REFRESH_TAP_DELAY = nonnegative_float_env(
     "REFRESH_TAP_DELAY",
-    1,
+    3,
 )
 
 REFRESH_SETTLE_DELAY = nonnegative_float_env(
     "REFRESH_SETTLE_DELAY",
-    2,
+    3,
 )
 
 

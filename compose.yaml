@@ -1,7 +1,7 @@
 name: watcher
 services:
   main:
-    image: ghcr.io/froststevefrost/watcher:0.1.0
+    image: ghcr.io/froststevefrost/watcher:0.1.1
     restart: unless-stopped
     env_file:
       - .env
