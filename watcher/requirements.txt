@@ -7,9 +7,9 @@
 adb-shell==0.4.4 \
     --hash=sha256:04c305f30a2ca25d5c54b3cd6ce9bb64c36e5f07967b23b3fb6aaecc851b90b6
     # via -r requirements.in
-apprise==1.13.1 \
-    --hash=sha256:2ded6d00562dd2ae9eb6f1e6cc8d3fb66e06f7ede6efac0ad029031b633780f4 \
-    --hash=sha256:e7689dda71aaf739244d6c8690de13cb1361b8d0a79980fb48bb397455ca0bdd
+apprise==2.0.0 \
+    --hash=sha256:945a2500a846b88b3c126a8d6e7c0472f6e3d94d8be52c836d8819f8db50b3d7 \
+    --hash=sha256:aeb321737f951860d7cb0a9574159090cbdbcb0f1ba01c6b49c69018380adf8d
     # via -r requirements.in
 certifi==2026.7.22 \
     --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \
@@ -548,4 +548,6 @@ rsa==4.9.1 \
 urllib3==2.8.0 \
     --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \
     --hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63
-    # via requests
+    # via
+    #   apprise
+    #   requests
