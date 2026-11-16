@@ -1,4 +1,4 @@
-FROM python:3.14.7-alpine3.24 AS builder
+FROM python:3.15.0-alpine3.24 AS builder
 
 RUN apk add --no-cache \
      gcc musl-dev libffi-dev openssl-dev cargo \
@@ -14,7 +14,7 @@ RUN pip wheel \
     -r requirements.txt
 
 # ----------  Runtime stage ----------
-FROM python:3.14.7-alpine3.24
+FROM python:3.15.0-alpine3.24
 ENV PYTHONUNBUFFERED=1 TZ=UTC
 
 RUN apk add --no-cache tzdata ca-certificates && \
