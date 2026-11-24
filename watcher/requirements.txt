@@ -7,9 +7,9 @@
 adb-shell==0.4.4 \
     --hash=sha256:04c305f30a2ca25d5c54b3cd6ce9bb64c36e5f07967b23b3fb6aaecc851b90b6
     # via -r requirements.in
-apprise==2.1.0 \
-    --hash=sha256:7eb453b31f37e6b24499b48320bf9d325038bbb1216e24ea7baaf73b062341c5 \
-    --hash=sha256:f743f4bc81dc5a68bddab53d420071b45541630dfea8c907a5e8b2b38555c681
+apprise==2.3.0 \
+    --hash=sha256:359b37320cb7cd169a57a475346bfeaccdb5074b307c6abaa3af7b62790b1b52 \
+    --hash=sha256:48988cec2fbcead2ada2cdbce01de62703324c79c1d163433b9902616f2f409e
     # via -r requirements.in
 certifi==2026.10.18 \
     --hash=sha256:73191c47aaa79da394e8fee2dbc2ec827432cab56311122c9e47abf79e390f62 \
